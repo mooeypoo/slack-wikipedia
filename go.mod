@@ -1,7 +1,5 @@
 module github.com/mooeypoo/slack-wikipedia
 
-go 1.12
+go 1.14
 
-require (
-	"github.com/slack-go/slack"
-)
+require github.com/slack-go/slack v0.6.4
