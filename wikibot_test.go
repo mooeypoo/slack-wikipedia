@@ -1,4 +1,0 @@
-package wikibot
-
-import "testing"
-
