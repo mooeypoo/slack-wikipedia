@@ -7,3 +7,5 @@ require (
 	github.com/shomali11/slacker v0.0.0-20200420173605-4887ab8127b6
 	github.com/slack-go/slack v0.6.5
 )
+
+replace github.com/golang/lint => golang.org/x/lint latest
