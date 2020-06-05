@@ -3,15 +3,16 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/mooeypoo/slack-wikipedia/wikipedia"
-	"github.com/shomali11/slacker"
-	"github.com/slack-go/slack"
 	"log"
 	"os"
 	"strings"
+
+	"github.com/mooeypoo/slack-wikipedia/wikipedia"
+	"github.com/shomali11/slacker"
+	"github.com/slack-go/slack"
 )
 
-const RESULTS_LIMIT = 3
+const resultsLimit = 3
 
 func main() {
 	token := os.Getenv("SLACK_TOKEN")
@@ -96,7 +97,7 @@ func main() {
 			results, _ := wikipedia.FetchTopPageviews(formattedRequestedTime)
 			fmt.Printf("Requested 'top' with parameter \"%s\" parsed into date \"%s\"\n", text, formattedRequestedTime)
 
-			if len(results.Pages) == 0 || results.Pages[0].Title == "" || results.Pages[0].Title == "Not found." {
+			if len(results) == 0 || results[0].Title == "" || results[0].Title == "Not found." {
 				notFoundText := slack.NewTextBlockObject("mrkdwn",
 					fmt.Sprintf("Oops, I couldn't find the top viewed articles for the date *\"%s\"*. :face_with_rolling_eyes: :grimacing:", formattedRequestedTime),
 					false, false)
@@ -114,7 +115,7 @@ func main() {
 					nil, nil)
 				attachments = append(attachments, header)
 
-				for _, page := range results.Pages {
+				for _, page := range results {
 					if page.Title != "Main Page" && page.Title != "Special:Search" && len(attachments) < 10 {
 						section := slack.NewSectionBlock(slack.NewTextBlockObject(
 							"mrkdwn",
@@ -146,7 +147,7 @@ func main() {
 
 // Build the reply attachments for the commands, and answer properly
 // when a search text query was not found.
-func getFullReplyAttachments(searchText string, headerText string, results wikipedia.MultiplePages) (att []slack.Block) {
+func getFullReplyAttachments(searchText string, headerText string, results []wikipedia.Page) (att []slack.Block) {
 	attachments := []slack.Block{}
 	if len(strings.TrimSpace(searchText)) == 0 {
 		notFoundText := slack.NewTextBlockObject("mrkdwn",
@@ -155,7 +156,7 @@ func getFullReplyAttachments(searchText string, headerText string, results wikip
 		attachments = append(attachments, notFoundText)
 		return attachments
 	}
-	if len(results.Pages) == 0 || results.Pages[0].Title == "" || results.Pages[0].Title == "Not found." {
+	if len(results) == 0 || results[0].Title == "" || results[0].Title == "Not found." {
 		notFoundText := slack.NewTextBlockObject("mrkdwn",
 			fmt.Sprintf("I couldn't find anything related to \"*%s*\" :face_with_rolling_eyes: :grimacing:", searchText),
 			false, false)
@@ -189,10 +190,10 @@ func getResultListHeader(headerStringText string) (att []slack.Block) {
 }
 
 // Build a slack block list from the results from the API
-func buildResultListAttachments(results wikipedia.MultiplePages) (att []slack.Block) {
+func buildResultListAttachments(results []wikipedia.Page) (att []slack.Block) {
 
 	infoTextPrintf := ""
-	if len(results.Pages) > 1 {
+	if len(results) > 1 {
 		// For multiple results, limit the extract
 		infoTextPrintf = "*<%s|%s>*\n%.200s[...]"
 	} else {
@@ -204,8 +205,8 @@ func buildResultListAttachments(results wikipedia.MultiplePages) (att []slack.Bl
 	attachments := []slack.Block{}
 
 	// Build the list
-	for index, page := range results.Pages {
-		if index >= RESULTS_LIMIT {
+	for index, page := range results {
+		if index >= resultsLimit {
 			break
 		}
 		imageURL := ""

@@ -4,13 +4,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+
 	// "log"
-	"github.com/araddon/dateparse"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/araddon/dateparse"
 )
 
 // TODO: Maybe make this configurable? Allow for other languages?
@@ -21,7 +23,7 @@ var wikiRESTrelated = "page/related/%s"
 var wikiActionAPIendpoint = "https://en.wikipedia.org/w/api.php"
 var wikiAnalyticsPageviewsEndpoint = "https://wikimedia.org/api/rest_v1/metrics/pageviews/top/en.wikipedia/all-access/%d/%02d/%02d" // "2020/06/02"
 
-// Normalized struct for page response
+// Page is a normalized structure for representing page data
 type Page struct {
 	Title   string
 	Extract string
@@ -29,15 +31,7 @@ type Page struct {
 	URL     string
 }
 
-// Normalized struct for multiple page response
-type MultiplePages struct {
-	Pages []Page
-}
-
-// Normalized struct for list
-type Pagelist struct {
-	Pages []PagelistPage
-}
+// PagelistPage represent normalized structure for an information for a page in a list
 type PagelistPage struct {
 	Title string
 	URL   string
@@ -45,13 +39,13 @@ type PagelistPage struct {
 	Info  string
 }
 
-// Fetch the summary of a specific Wikipedia page given by its title
-func FetchSummary(title string) (resp MultiplePages) {
+// FetchSummary fetches the summary of a specific Wikipedia page given by its title
+func FetchSummary(title string) (resp []Page) {
 	safeTitle := prepTitleForURLQuery(title)
 	url := fmt.Sprintf(wikiRESTEndpoint+wikiRESTsummary, safeTitle)
 	fmt.Println("Fetching summary: " + url)
 
-	body, readErr := fetchFromApi(url)
+	body, readErr := fetchFromAPI(url)
 	if readErr != nil {
 		return getNotFound()
 	}
@@ -59,13 +53,13 @@ func FetchSummary(title string) (resp MultiplePages) {
 	return processRESTApiResult(body, false)
 }
 
-// Fetch related pages to the given term
-func FetchRelated(term string) (resp MultiplePages) {
+// FetchRelated fetches the related pages for the given term
+func FetchRelated(term string) (resp []Page) {
 	safeTitle := prepTitleForURLQuery(term)
 	url := fmt.Sprintf(wikiRESTEndpoint+wikiRESTrelated, safeTitle)
 	fmt.Println("Fetching related: " + url)
 
-	body, readErr := fetchFromApi(url)
+	body, readErr := fetchFromAPI(url)
 	if readErr != nil {
 		return getNotFound()
 	}
@@ -73,8 +67,8 @@ func FetchRelated(term string) (resp MultiplePages) {
 	return processRESTApiResult(body, true)
 }
 
-// Fetch search results from Wikipedia given the search string
-func FetchSearch(searchString string) (resp MultiplePages) {
+// FetchSearch fetches search results from Wikipedia given the search string
+func FetchSearch(searchString string) (resp []Page) {
 	safeTitle := prepTitleForURLQuery(searchString)
 
 	params := url.Values{}
@@ -96,13 +90,15 @@ func FetchSearch(searchString string) (resp MultiplePages) {
 	url := wikiActionAPIendpoint + "?" + params.Encode()
 	fmt.Println("Fetching search: " + url)
 
-	body, readErr := fetchFromApi(url)
+	body, readErr := fetchFromAPI(url)
 	if readErr != nil {
 		return getNotFound()
 	}
 
 	return processActionAPIResult(body)
 }
+
+// ParseTimeString normalizes and then parses the given string into a time object
 func ParseTimeString(datestring string) (parsed time.Time) {
 	datestring = strings.TrimSpace(datestring)
 	fmt.Printf("Parsing time string \"%s\"", datestring)
@@ -119,17 +115,16 @@ func ParseTimeString(datestring string) (parsed time.Time) {
 	}
 	return t
 }
-func FetchTopPageviews(datestring string) (resp Pagelist, requestedTime time.Time) {
+
+// FetchTopPageviews fetches the top articles by pageview for a given date.
+func FetchTopPageviews(datestring string) (resp []PagelistPage, requestedTime time.Time) {
 	t := ParseTimeString(datestring)
 	// Build the url
-	// fmt.Println("FetchTopPageviews Date: " + t.Format("January 2, 2005"))
 	url := fmt.Sprintf(wikiAnalyticsPageviewsEndpoint, t.Year(), int(t.Month()), t.Day())
 	fmt.Println("FetchTopPageviews URL: " + url)
-	body, readErr := fetchFromApi(url)
+	body, readErr := fetchFromAPI(url)
 	if readErr != nil {
-		return Pagelist{
-			Pages: []PagelistPage{PagelistPage{"Not found.", "", 0, ""}},
-		}, t
+		return []PagelistPage{{"Not found.", "", 0, ""}}, t
 	}
 
 	return processAnalyticsPageviews(body), t
@@ -148,7 +143,7 @@ func prepTitleForURLQuery(text string) (urlSafeTitle string) {
 
 // Fetch data from the given API link
 // Return the bytstream for the body of the reply to be processed
-func fetchFromApi(link string) (body []byte, err error) {
+func fetchFromAPI(link string) (body []byte, err error) {
 	wikiClient := http.Client{
 		Timeout: time.Second * 2, // Maximum of 2 secs
 	}
@@ -174,8 +169,8 @@ func fetchFromApi(link string) (body []byte, err error) {
 }
 
 // Get result from the Wikipedia Action API and output a normalized
-// data structure through MultiplePages
-func processActionAPIResult(body []byte) (page MultiplePages) {
+// data structure through Page structure
+func processActionAPIResult(body []byte) (page []Page) {
 	record := ActionAPIGeneratorResponse{}
 	jsonErr := json.Unmarshal(body, &record)
 	if jsonErr != nil {
@@ -191,44 +186,44 @@ func processActionAPIResult(body []byte) (page MultiplePages) {
 			page.Thumbnail.Source,
 			page.Canonicalurl})
 	}
-	return MultiplePages{Pages: collection}
+	return collection
 }
 
 // Get result from the Wikipedia RESTBASE API and output a normalized
-// data structure through MultiplePages
+// data structure through multiple Page output
 // isMultple parameter should be set to true if the request is expected
 // to return a JSON structure that holds multiple results. False otherwise.
-func processRESTApiResult(body []byte, isMultiple bool) (page MultiplePages) {
+func processRESTApiResult(body []byte, isMultiple bool) (page []Page) {
 	if isMultiple {
 		record := MultiplePageResponseREST{}
 		jsonErr := json.Unmarshal(body, &record)
 		if jsonErr != nil {
 			fmt.Println(jsonErr)
 			return getNotFound()
-		} else {
-			collection := []Page{}
-			for _, page := range record.Pages {
-				collection = append(collection, Page{
-					page.Titles.Normalized,
-					strings.TrimSpace(page.Extract),
-					page.Thumbnail.Source,
-					page.ContentUrls.Desktop.Page})
-			}
-			return MultiplePages{Pages: collection}
 		}
-	} else {
-		record := PageResponseREST{}
-		jsonErr := json.Unmarshal(body, &record)
-		if jsonErr != nil {
-			fmt.Println(jsonErr)
-			return getNotFound()
-		} else {
-			return MultiplePages{Pages: []Page{{record.Titles.Normalized, strings.TrimSpace(record.Extract), record.Thumbnail.Source, record.ContentUrls.Desktop.Page}}}
+		collection := []Page{}
+		for _, page := range record.Pages {
+			collection = append(collection, Page{
+				page.Titles.Normalized,
+				strings.TrimSpace(page.Extract),
+				page.Thumbnail.Source,
+				page.ContentUrls.Desktop.Page})
 		}
+		return collection
 	}
+
+	record := PageResponseREST{}
+	jsonErr := json.Unmarshal(body, &record)
+	if jsonErr != nil {
+		fmt.Println(jsonErr)
+		return getNotFound()
+	}
+	return []Page{{record.Titles.Normalized, strings.TrimSpace(record.Extract), record.Thumbnail.Source, record.ContentUrls.Desktop.Page}}
 }
 
-func processAnalyticsPageviews(body []byte) (list Pagelist) {
+// Process the result from the Wikipedia analytics Pageview API endpoint
+// and return a list representing the pages with their pageview and rank
+func processAnalyticsPageviews(body []byte) (list []PagelistPage) {
 	record := AnalyticsPageviews{}
 	jsonErr := json.Unmarshal(body, &record)
 	if jsonErr != nil || len(record.Items) == 0 {
@@ -237,30 +232,28 @@ func processAnalyticsPageviews(body []byte) (list Pagelist) {
 			fmt.Println("Error fetching this date. Details:")
 			fmt.Println(record.Detail)
 		}
-		return Pagelist{
-			Pages: []PagelistPage{PagelistPage{"Not found.", "", 0, ""}},
-		}
+		return []PagelistPage{{"Not found.", "", 0, ""}}
 	}
 	results := record.Items[0].Articles
 	collection := []PagelistPage{}
 	for _, page := range results {
-		articleUrl := fmt.Sprintf(wikiBaseArticlePath, page.Article)
+		articleURL := fmt.Sprintf(wikiBaseArticlePath, page.Article)
 
 		collection = append(collection, PagelistPage{
 			strings.ReplaceAll(page.Article, "_", " "), // Title
-			articleUrl,                // URL
+			articleURL,                // URL
 			page.Rank,                 // Rank
 			strconv.Itoa(page.Views)}) // Pageviews, stringified
 	}
-	return Pagelist{Pages: collection}
-
+	return collection
 }
 
-// Output the normalized MultiplePages struct with a 'not found' result.
-func getNotFound() (pages MultiplePages) {
-	return MultiplePages{Pages: []Page{{"Not found.", "", "", ""}}}
+// Output the normalized structure with a 'not found' result.
+func getNotFound() (pages []Page) {
+	return []Page{{"Not found.", "", "", ""}}
 }
 
+// Get the date for today in UTC timezone
 func getUTCDateToday() (datetime time.Time) {
 	location, err := time.LoadLocation("UTC")
 	if err != nil {
@@ -269,7 +262,17 @@ func getUTCDateToday() (datetime time.Time) {
 	return time.Now().In(location)
 }
 
-func IsDateBeforeUTCToday(requestedDate time.Time) (bigorsmall bool) {
+// IsDateBeforeUTCToday checks whether the given date is before the official "today" date of UTC.
+//
+// This is meant to see if there needs to be a conversion (going 'back' a day)
+// when the user from a timezone that is ahead of UTC requests data for a certain
+// date. For example, a user in San Francisco asking for results for June 5th,
+// The UTC date may still be June 4th, which means the results from the remote
+// API request (specifically analytics clusters, but others may as well) be
+// unavailable. If that is the case, this gives the consumer a chance to change
+// the date to a day before or alert the user that they should change their
+// requested date themselves.
+func IsDateBeforeUTCToday(requestedDate time.Time) (isBefore bool) {
 	utcDate := getUTCDateToday()
 	// Can't do the direct time comparison (time.Before() time.After())
 	// because the actual timestamp doesn't matter, just the year/month/day

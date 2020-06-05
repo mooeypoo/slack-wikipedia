@@ -4,7 +4,8 @@ import (
 	"time"
 )
 
-// API Response structs
+// ActionAPIGeneratorResponse is the structure expected from
+// the Wikipedia action API using a generator
 type ActionAPIGeneratorResponse struct {
 	Batchcomplete string `json:"batchcomplete"`
 	Continue      struct {
@@ -16,6 +17,10 @@ type ActionAPIGeneratorResponse struct {
 	} `json:"query"`
 }
 
+// ActionAPIBaseResponsePageInfo is the structure of the individual
+// pages in the ActionAPIGeneratorResponse. It is declared separately
+// so that a map can be used, since the API returns an object with
+// dynamic keys per page information.
 type ActionAPIBaseResponsePageInfo struct {
 	Pageid    int    `json:"pageid"`
 	Ns        int    `json:"ns"`
@@ -40,10 +45,17 @@ type ActionAPIBaseResponsePageInfo struct {
 	Canonicalurl         string    `json:"canonicalurl"`
 }
 
+// MultiplePageResponseREST is the wrapper around the response
+// for multiple pages coming from the Wikipedia REST api
 type MultiplePageResponseREST struct {
 	Pages []PageResponseREST `json:"pages"`
 }
 
+// PageResponseREST is the response expected from the Wikipedia
+// REST API for page results. If the response is a single page,
+// this is the structure expected from the API. If the response
+// contains multiple pages, it will be wrapped with an object
+// that is represented by the MultiplePageResponseREST struct
 type PageResponseREST struct {
 	Type         string `json:"type"`
 	Title        string `json:"title"`
@@ -106,6 +118,8 @@ type PageResponseREST struct {
 	ExtractHTML string `json:"extract_html"`
 }
 
+// AnalyticsPageviews is the structure that is expected from the
+// Wikipedia analytics API, like for pageviews requests
 type AnalyticsPageviews struct {
 	Title  string `json:"title"`
 	Detail string `json:"detail"`
