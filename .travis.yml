@@ -3,7 +3,7 @@ go:
 - 1.14.x
 
 install:
-- go get -u golang.org/x/lint
+- go get -u golang.org/x/lint/golint
 - go get -u github.com/araddon/dateparse
 - go get -u github.com/shomali11/slacker
 - go get -u github.com/slack-go/slack
