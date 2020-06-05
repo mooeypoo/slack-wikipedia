@@ -5,23 +5,22 @@ import (
 	"fmt"
 	"io/ioutil"
 
-	// "log"
+	"github.com/araddon/dateparse"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/araddon/dateparse"
 )
 
 // TODO: Maybe make this configurable? Allow for other languages?
-var wikiBaseArticlePath = "https://en.wikipedia.org/wiki/%s"
-var wikiRESTEndpoint = "https://en.wikipedia.org/api/rest_v1/"
+var wikiBaseArticlePath = "https://%s.wikipedia.org/wiki/%s"
+var wikiRESTEndpoint = "https://%s.wikipedia.org/api/rest_v1/"
 var wikiRESTsummary = "page/summary/%s?redirect=true"
 var wikiRESTrelated = "page/related/%s"
-var wikiActionAPIendpoint = "https://en.wikipedia.org/w/api.php"
-var wikiAnalyticsPageviewsEndpoint = "https://wikimedia.org/api/rest_v1/metrics/pageviews/top/en.wikipedia/all-access/%d/%02d/%02d" // "2020/06/02"
+var wikiActionAPIendpoint = "https://%s.wikipedia.org/w/api.php"
+var wikiAnalyticsPageviewsEndpoint = "https://wikimedia.org/api/rest_v1/metrics/pageviews/top/%s.wikipedia/all-access/%d/%02d/%02d" // "2020/06/02"
 
 // Page is a normalized structure for representing page data
 type Page struct {
@@ -40,36 +39,43 @@ type PagelistPage struct {
 }
 
 // FetchSummary fetches the summary of a specific Wikipedia page given by its title
-func FetchSummary(title string) (resp []Page) {
-	safeTitle := prepTitleForURLQuery(title)
-	url := fmt.Sprintf(wikiRESTEndpoint+wikiRESTsummary, safeTitle)
+func FetchSummary(title string) (resp []Page, lang string, actualTitle string) {
+	lang, strippedTitle := ParseLanguageFromText(title)
+	safeTitle := prepTitleForURLQuery(strippedTitle)
+
+	url := fmt.Sprintf(wikiRESTEndpoint+wikiRESTsummary, lang, safeTitle)
 	fmt.Println("Fetching summary: " + url)
 
 	body, readErr := fetchFromAPI(url)
 	if readErr != nil {
-		return getNotFound()
+		return getNotFound(), lang, strippedTitle
 	}
 
-	return processRESTApiResult(body, false)
+	return processRESTApiResult(body, false), lang, strippedTitle
 }
 
 // FetchRelated fetches the related pages for the given term
-func FetchRelated(term string) (resp []Page) {
-	safeTitle := prepTitleForURLQuery(term)
-	url := fmt.Sprintf(wikiRESTEndpoint+wikiRESTrelated, safeTitle)
+func FetchRelated(term string) (resp []Page, lang string, actualTerm string) {
+	lang, strippedTerm := ParseLanguageFromText(term)
+	safeTitle := prepTitleForURLQuery(strippedTerm)
+
+	fmt.Println("FetchRelated lang: " + lang)
+
+	url := fmt.Sprintf(wikiRESTEndpoint+wikiRESTrelated, lang, safeTitle)
 	fmt.Println("Fetching related: " + url)
 
 	body, readErr := fetchFromAPI(url)
 	if readErr != nil {
-		return getNotFound()
+		return getNotFound(), lang, strippedTerm
 	}
 
-	return processRESTApiResult(body, true)
+	return processRESTApiResult(body, true), lang, strippedTerm
 }
 
 // FetchSearch fetches search results from Wikipedia given the search string
-func FetchSearch(searchString string) (resp []Page) {
-	safeTitle := prepTitleForURLQuery(searchString)
+func FetchSearch(searchString string) (resp []Page, lang string, actualSearchString string) {
+	lang, strippedTerm := ParseLanguageFromText(searchString)
+	safeTitle := prepTitleForURLQuery(strippedTerm)
 
 	params := url.Values{}
 
@@ -87,15 +93,37 @@ func FetchSearch(searchString string) (resp []Page) {
 	params.Add("gsrwhat", "text")
 	params.Add("gsrsearch", safeTitle)
 
-	url := wikiActionAPIendpoint + "?" + params.Encode()
+	url := fmt.Sprintf(wikiActionAPIendpoint, lang) + "?" + params.Encode()
 	fmt.Println("Fetching search: " + url)
 
 	body, readErr := fetchFromAPI(url)
 	if readErr != nil {
-		return getNotFound()
+		return getNotFound(), lang, strippedTerm
 	}
 
-	return processActionAPIResult(body)
+	return processActionAPIResult(body), lang, strippedTerm
+}
+
+// FetchTopPageviews fetches the top articles by pageview for a given date.
+// Lang parameter will dictate the Wikipedia that will be searched. If given
+// empty string, will fall back on "en"
+func FetchTopPageviews(datestring string, lang string) (resp []PagelistPage) {
+	t := ParseTimeString(datestring)
+
+	if len(lang) == 0 {
+		lang = "en"
+	}
+	// Build the url
+	url := fmt.Sprintf(wikiAnalyticsPageviewsEndpoint, lang, t.Year(), int(t.Month()), t.Day())
+
+	fmt.Println("FetchTopPageviews URL: " + url)
+
+	body, readErr := fetchFromAPI(url)
+	if readErr != nil {
+		return []PagelistPage{{"Not found.", "", 0, ""}}
+	}
+
+	return processAnalyticsPageviews(body, lang)
 }
 
 // ParseTimeString normalizes and then parses the given string into a time object
@@ -116,18 +144,18 @@ func ParseTimeString(datestring string) (parsed time.Time) {
 	return t
 }
 
-// FetchTopPageviews fetches the top articles by pageview for a given date.
-func FetchTopPageviews(datestring string) (resp []PagelistPage, requestedTime time.Time) {
-	t := ParseTimeString(datestring)
-	// Build the url
-	url := fmt.Sprintf(wikiAnalyticsPageviewsEndpoint, t.Year(), int(t.Month()), t.Day())
-	fmt.Println("FetchTopPageviews URL: " + url)
-	body, readErr := fetchFromAPI(url)
-	if readErr != nil {
-		return []PagelistPage{{"Not found.", "", 0, ""}}, t
+// ParseLanguageFromText looks for the lang=xx expression and outputs
+// the language, or defaults to 'en' if language wasn't found.
+func ParseLanguageFromText(text string) (lang string, remainingText string) {
+	r, _ := regexp.Compile("lang=([[:alpha:]_-]+)")
+	match := r.FindStringSubmatch(text)
+	fmt.Println(match)
+	if len(match) > 0 {
+		// Remove that from the string
+		newText := strings.TrimSpace(r.ReplaceAllString(text, ""))
+		return match[1], newText
 	}
-
-	return processAnalyticsPageviews(body), t
+	return "en", strings.TrimSpace(text)
 }
 
 // Prepare a given string to be used in a URL query
@@ -223,7 +251,7 @@ func processRESTApiResult(body []byte, isMultiple bool) (page []Page) {
 
 // Process the result from the Wikipedia analytics Pageview API endpoint
 // and return a list representing the pages with their pageview and rank
-func processAnalyticsPageviews(body []byte) (list []PagelistPage) {
+func processAnalyticsPageviews(body []byte, lang string) (list []PagelistPage) {
 	record := AnalyticsPageviews{}
 	jsonErr := json.Unmarshal(body, &record)
 	if jsonErr != nil || len(record.Items) == 0 {
@@ -237,7 +265,7 @@ func processAnalyticsPageviews(body []byte) (list []PagelistPage) {
 	results := record.Items[0].Articles
 	collection := []PagelistPage{}
 	for _, page := range results {
-		articleURL := fmt.Sprintf(wikiBaseArticlePath, page.Article)
+		articleURL := fmt.Sprintf(wikiBaseArticlePath, lang, url.QueryEscape(page.Article))
 
 		collection = append(collection, PagelistPage{
 			strings.ReplaceAll(page.Article, "_", " "), // Title

@@ -25,9 +25,9 @@ func main() {
 			response.Typing()
 
 			text := request.StringParam("text", "")
-			result := wikipedia.FetchSummary(text)
+			result, lang, actualTitle := wikipedia.FetchSummary(text)
 
-			attachments := getFullReplyAttachments(text, fmt.Sprintf("Here's the page for \"*%s*\" on Wikipedia:", text), result)
+			attachments := getFullReplyAttachments(actualTitle, fmt.Sprintf("Here's the page for \"*%s*\" on %s.Wikipedia:", actualTitle, lang), result, lang)
 			response.Reply(text, slacker.WithBlocks(attachments))
 		},
 	}
@@ -39,9 +39,9 @@ func main() {
 			response.Typing()
 
 			text := request.StringParam("text", "")
-			results := wikipedia.FetchRelated(text)
+			results, lang, actualText := wikipedia.FetchRelated(text)
 
-			attachments := getFullReplyAttachments(text, fmt.Sprintf("Here's are some Wikipedia articles related to \"*%s*\":", text), results)
+			attachments := getFullReplyAttachments(actualText, fmt.Sprintf("Here's are some %s.Wikipedia articles related to \"*%s*\":", lang, actualText), results, lang)
 			response.Reply(text, slacker.WithBlocks(attachments))
 		},
 	}
@@ -53,9 +53,9 @@ func main() {
 			response.Typing()
 
 			text := request.StringParam("text", "")
-			results := wikipedia.FetchSearch(text)
+			results, lang, strippedText := wikipedia.FetchSearch(text)
 
-			attachments := getFullReplyAttachments(text, fmt.Sprintf("Here's what I found for \"*%s*\" on Wikipedia:", text), results)
+			attachments := getFullReplyAttachments(strippedText, fmt.Sprintf("Here's what I found for \"*%s*\" on %s.Wikipedia:", strippedText, lang), results, lang)
 			response.Reply(text, slacker.WithBlocks(attachments))
 		},
 	}
@@ -67,7 +67,8 @@ func main() {
 			response.Typing()
 
 			text := request.StringParam("text", "")
-			actualRequestedTime := wikipedia.ParseTimeString(text)
+			lang, strippedText := wikipedia.ParseLanguageFromText(text)
+			actualRequestedTime := wikipedia.ParseTimeString(strippedText)
 
 			// Build output
 			attachments := []slack.Block{}
@@ -94,12 +95,12 @@ func main() {
 
 			formattedRequestedTime := fmt.Sprintf("%s %02d %d", actualRequestedTime.Month(), actualRequestedTime.Day(), actualRequestedTime.Year())
 
-			results, _ := wikipedia.FetchTopPageviews(formattedRequestedTime)
+			results := wikipedia.FetchTopPageviews(formattedRequestedTime, lang)
 			fmt.Printf("Requested 'top' with parameter \"%s\" parsed into date \"%s\"\n", text, formattedRequestedTime)
 
 			if len(results) == 0 || results[0].Title == "" || results[0].Title == "Not found." {
 				notFoundText := slack.NewTextBlockObject("mrkdwn",
-					fmt.Sprintf("Oops, I couldn't find the top viewed articles for the date *\"%s\"*. :face_with_rolling_eyes: :grimacing:", formattedRequestedTime),
+					fmt.Sprintf("Oops, I couldn't find the top viewed articles in %s.Wikipedia for the date *\"%s\"*. :face_with_rolling_eyes: :grimacing:", lang, formattedRequestedTime),
 					false, false)
 				fmt.Println("Request for top views not found.")
 				headerSection := slack.NewSectionBlock(notFoundText, nil, nil)
@@ -110,13 +111,14 @@ func main() {
 				// And cut at 10 items
 				header := slack.NewSectionBlock(slack.NewTextBlockObject(
 					"mrkdwn",
-					fmt.Sprintf("Top viewed pages for *%s* _(Not including the Main and Search pages)_", formattedRequestedTime),
+					fmt.Sprintf("Top viewed pages for *%s* on %s.Wikipedia", formattedRequestedTime, lang),
 					false, false),
 					nil, nil)
 				attachments = append(attachments, header)
 
 				for _, page := range results {
-					if page.Title != "Main Page" && page.Title != "Special:Search" && len(attachments) < 10 {
+					// if page.Title != "Main Page" && page.Title != "Special:Search" && len(attachments) < 10 {
+					if len(attachments) < 10 {
 						section := slack.NewSectionBlock(slack.NewTextBlockObject(
 							"mrkdwn",
 							fmt.Sprintf("*%d most viewed:* <%s|%s> (%s page views)", page.Rank, page.URL, page.Title, page.Info),
@@ -147,20 +149,22 @@ func main() {
 
 // Build the reply attachments for the commands, and answer properly
 // when a search text query was not found.
-func getFullReplyAttachments(searchText string, headerText string, results []wikipedia.Page) (att []slack.Block) {
+func getFullReplyAttachments(searchText string, headerText string, results []wikipedia.Page, lang string) (att []slack.Block) {
 	attachments := []slack.Block{}
 	if len(strings.TrimSpace(searchText)) == 0 {
 		notFoundText := slack.NewTextBlockObject("mrkdwn",
 			"Give me something to look up...?",
 			false, false)
-		attachments = append(attachments, notFoundText)
+		notFoundSection := slack.NewSectionBlock(notFoundText, nil, nil)
+		attachments = append(attachments, notFoundSection)
 		return attachments
 	}
 	if len(results) == 0 || results[0].Title == "" || results[0].Title == "Not found." {
 		notFoundText := slack.NewTextBlockObject("mrkdwn",
-			fmt.Sprintf("I couldn't find anything related to \"*%s*\" :face_with_rolling_eyes: :grimacing:", searchText),
+			fmt.Sprintf("I couldn't find anything related to \"*%s*\" on %s.Wikipedia :face_with_rolling_eyes: :grimacing:", searchText, lang),
 			false, false)
-		attachments = append(attachments, notFoundText)
+		notFoundSection := slack.NewSectionBlock(notFoundText, nil, nil)
+		attachments = append(attachments, notFoundSection)
 		return attachments
 	}
 
