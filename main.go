@@ -217,7 +217,7 @@ func buildResultListAttachments(results []wikipedia.Page) (att []slack.Block) {
 		if page.Image != "" {
 			imageURL = page.Image
 		} else {
-			imageURL = "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f1/No-image.svg/200px-No-image.svg.png"
+			imageURL = "https://upload.wikimedia.org/wikipedia/commons/thumb/0/02/Transparent_square.svg/200px-Transparent_square.svg.png"
 		}
 		attachments = append(attachments, slack.NewSectionBlock(
 			// Item info
