@@ -213,20 +213,24 @@ func buildResultListAttachments(results []wikipedia.Page) (att []slack.Block) {
 		if index >= resultsLimit {
 			break
 		}
-		imageURL := ""
+
+		itemInfo := slack.NewTextBlockObject(
+			"mrkdwn",
+			fmt.Sprintf(infoTextPrintf, page.URL, page.Title, page.Extract),
+			false, false)
+
 		if page.Image != "" {
-			imageURL = page.Image
+			attachments = append(attachments, slack.NewSectionBlock(
+				itemInfo,
+				nil,
+				slack.NewAccessory(slack.NewImageBlockElement(page.Image, page.Title))))
 		} else {
-			imageURL = "https://upload.wikimedia.org/wikipedia/commons/thumb/0/02/Transparent_square.svg/200px-Transparent_square.svg.png"
+			attachments = append(attachments, slack.NewSectionBlock(
+				// Item info
+				itemInfo,
+				nil,
+				nil))
 		}
-		attachments = append(attachments, slack.NewSectionBlock(
-			// Item info
-			slack.NewTextBlockObject(
-				"mrkdwn",
-				fmt.Sprintf(infoTextPrintf, page.URL, page.Title, page.Extract),
-				false, false),
-			nil,
-			slack.NewAccessory(slack.NewImageBlockElement(imageURL, page.Title))))
 	}
 
 	return attachments

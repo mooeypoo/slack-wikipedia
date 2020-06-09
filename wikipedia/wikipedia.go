@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -28,6 +29,7 @@ type Page struct {
 	Extract string
 	Image   string
 	URL     string
+	Rank    int
 }
 
 // PagelistPage represent normalized structure for an information for a page in a list
@@ -212,8 +214,13 @@ func processActionAPIResult(body []byte) (page []Page) {
 			page.Title,
 			strings.TrimSpace(page.Extract),
 			page.Thumbnail.Source,
-			page.Canonicalurl})
+			page.Canonicalurl,
+			page.Index})
 	}
+	sort.SliceStable(collection, func(i, j int) bool {
+		return collection[i].Rank < collection[j].Rank
+	})
+
 	return collection
 }
 
@@ -235,7 +242,8 @@ func processRESTApiResult(body []byte, isMultiple bool) (page []Page) {
 				page.Titles.Normalized,
 				strings.TrimSpace(page.Extract),
 				page.Thumbnail.Source,
-				page.ContentUrls.Desktop.Page})
+				page.ContentUrls.Desktop.Page,
+				0})
 		}
 		return collection
 	}
@@ -246,7 +254,7 @@ func processRESTApiResult(body []byte, isMultiple bool) (page []Page) {
 		fmt.Println(jsonErr)
 		return getNotFound()
 	}
-	return []Page{{record.Titles.Normalized, strings.TrimSpace(record.Extract), record.Thumbnail.Source, record.ContentUrls.Desktop.Page}}
+	return []Page{{record.Titles.Normalized, strings.TrimSpace(record.Extract), record.Thumbnail.Source, record.ContentUrls.Desktop.Page, 0}}
 }
 
 // Process the result from the Wikipedia analytics Pageview API endpoint
@@ -278,7 +286,7 @@ func processAnalyticsPageviews(body []byte, lang string) (list []PagelistPage) {
 
 // Output the normalized structure with a 'not found' result.
 func getNotFound() (pages []Page) {
-	return []Page{{"Not found.", "", "", ""}}
+	return []Page{{"Not found.", "", "", "", 0}}
 }
 
 // Get the date for today in UTC timezone
