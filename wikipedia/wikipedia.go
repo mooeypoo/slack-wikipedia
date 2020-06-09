@@ -304,5 +304,5 @@ func IsDateBeforeUTCToday(requestedDate time.Time) (isBefore bool) {
 	utcDate := getUTCDateToday()
 	// Can't do the direct time comparison (time.Before() time.After())
 	// because the actual timestamp doesn't matter, just the year/month/day
-	return requestedDate.Year() <= utcDate.Year() && requestedDate.Month() <= utcDate.Month() && requestedDate.Day() <= utcDate.Day()
+	return requestedDate.Year() <= utcDate.Year() && requestedDate.Month() <= utcDate.Month() && requestedDate.Day() < utcDate.Day()
 }
