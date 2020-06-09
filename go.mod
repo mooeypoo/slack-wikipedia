@@ -8,4 +8,4 @@ require (
 	github.com/slack-go/slack v0.6.5
 )
 
-replace github.com/golang/lint => golang.org/x/lint latest
+replace github.com/golang/lint => golang.org/x/lint v0.0.0-20200302205851-738671d3881b

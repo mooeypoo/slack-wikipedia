@@ -42,7 +42,7 @@ func main() {
 			results, lang, actualText := wikipedia.FetchRelated(text)
 
 			attachments := getFullReplyAttachments(actualText, fmt.Sprintf("Here's are some %s.Wikipedia articles related to \"*%s*\":", lang, actualText), results, lang)
-			response.Reply(text, slacker.WithBlocks(attachments))
+			response.Reply(text, slacker.WithBlocks(attachments), slacker.WithThreadReply(true))
 		},
 	}
 
@@ -56,7 +56,7 @@ func main() {
 			results, lang, strippedText := wikipedia.FetchSearch(text)
 
 			attachments := getFullReplyAttachments(strippedText, fmt.Sprintf("Here's what I found for \"*%s*\" on %s.Wikipedia:", strippedText, lang), results, lang)
-			response.Reply(text, slacker.WithBlocks(attachments))
+			response.Reply(text, slacker.WithBlocks(attachments), slacker.WithThreadReply(true))
 		},
 	}
 
@@ -129,7 +129,7 @@ func main() {
 				}
 			}
 			fmt.Printf("Sending response to Slack with %d attachments\n", len(attachments))
-			response.Reply(formattedRequestedTime, slacker.WithBlocks(attachments))
+			response.Reply(formattedRequestedTime, slacker.WithBlocks(attachments), slacker.WithThreadReply(true))
 		},
 	}
 
