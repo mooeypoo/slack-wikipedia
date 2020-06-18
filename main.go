@@ -73,11 +73,10 @@ func main() {
 			// Build output
 			attachments := []slack.Block{}
 
-			if wikipedia.IsDateBeforeUTCToday(actualRequestedTime) {
+			if !wikipedia.IsDateBeforeUTCToday(actualRequestedTime) {
 				// We are asking for a date that is still "tomorrow" for UTC
 				// Change that to the previous day
 				newRequestedTime := actualRequestedTime.AddDate(0, 0, -1)
-
 				// Let the user know, but only if the user actually requested a date and not an empty string
 				if len(strings.TrimSpace(text)) != 0 {
 					humanReadableOrig := fmt.Sprintf("%s %02d %d", actualRequestedTime.Month(), actualRequestedTime.Day(), actualRequestedTime.Year())

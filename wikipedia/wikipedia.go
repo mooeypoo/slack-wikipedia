@@ -113,6 +113,7 @@ func FetchTopPageviews(datestring string, lang string) (resp []PagelistPage) {
 	if len(lang) == 0 {
 		lang = "en"
 	}
+
 	// Build the url
 	url := fmt.Sprintf(wikiAnalyticsPageviewsEndpoint, lang, t.Year(), int(t.Month()), t.Day())
 
@@ -354,7 +355,9 @@ func IsDateBeforeUTCToday(requestedDate time.Time) (isBefore bool) {
 	utcDate := time.Now().In(location)
 	// Can't do the direct time comparison (time.Before() time.After())
 	// because the actual timestamp doesn't matter, just the year/month/day
-	return requestedDate.Year() <= utcDate.Year() && requestedDate.Month() <= utcDate.Month() && requestedDate.Day() < utcDate.Day()
+	isBeforeUTC := requestedDate.Year() <= utcDate.Year() && requestedDate.Month() <= utcDate.Month() && requestedDate.Day() < utcDate.Day()
+	toLog("IsDateBeforeUTCToday", "Requested: "+requestedDate.Format(time.RFC822)+", UTC Date: "+utcDate.Format(time.RFC822)+" -> BEFORE: "+strconv.FormatBool(isBeforeUTC))
+	return isBeforeUTC
 }
 
 // Output the normalized structure with a 'not found' result.
