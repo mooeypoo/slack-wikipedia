@@ -133,6 +133,55 @@ func main() {
 		},
 	}
 
+	defGet := &slacker.CommandDefinition{
+		Description: "Get information about this term from Wikipedia",
+		Example:     "get SF airport",
+		Handler: func(request slacker.Request, response slacker.ResponseWriter) {
+			response.Typing()
+
+			text := request.StringParam("text", "")
+			// results, related, lang, actualTitle := wikipedia.FetchGetGeneralTerm(text)
+			results, related, lang, actualTitle := wikipedia.FetchGetGeneralTerm(text)
+
+			// Get the response first; this will already return the correct
+			// format, whether it was summary or search list
+			attachments := getFullReplyAttachments(actualTitle, fmt.Sprintf("Here's what I found for \"*%s*\" on %s.Wikipedia:", actualTitle, lang), results, lang)
+
+			// Add related pages, if they exist
+			relatedTitles := []string{}
+			itemCount := 0
+			if len(related) > 0 && related[0].Title != "Not found." {
+				for _, item := range related {
+					// Limit to 5 related
+					if itemCount >= 5 {
+						break
+					}
+					relatedTitles = append(relatedTitles, fmt.Sprintf("<%s|%s>", item.URL, item.Title))
+					itemCount++
+				}
+			}
+			if len(relatedTitles) > 0 {
+				fullList := strings.Join(relatedTitles, ", ")
+				// Add a box underneath:
+				attachments = append(attachments, slack.NewSectionBlock(
+					slack.NewTextBlockObject(
+						"mrkdwn",
+						fmt.Sprintf("*Some related pages:* %s", fullList),
+						false, false),
+					nil,
+					nil))
+			}
+
+			// Check whether to deliver in a reply or not
+			inReply := len(results) > 1
+
+			response.Reply(text, slacker.WithBlocks(attachments), slacker.WithThreadReply(inReply))
+
+		},
+	}
+
+	bot.Command("get <text>", defGet)
+
 	bot.Command("summary <text>", defSummary)
 	bot.Command("related <text>", defRelated)
 	bot.Command("search <text>", defSearch)
@@ -199,7 +248,7 @@ func buildResultListAttachments(results []wikipedia.Page) (att []slack.Block) {
 	infoTextPrintf := ""
 	if len(results) > 1 {
 		// For multiple results, limit the extract
-		infoTextPrintf = "*<%s|%s>*\n%.200s[...]"
+		infoTextPrintf = "*<%s|%s>*\n%.150s[...]"
 	} else {
 		// For one result, don't limit the extract
 		infoTextPrintf = "*<%s|%s>*\n%s"
