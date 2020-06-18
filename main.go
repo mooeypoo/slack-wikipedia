@@ -18,33 +18,33 @@ func main() {
 	token := os.Getenv("SLACK_TOKEN")
 	bot := slacker.NewClient(token)
 	fmt.Println("Bot connected.")
-	defSummary := &slacker.CommandDefinition{
-		Description: "Get the summary of the given page.",
-		Example:     "summary san francisco international airport",
-		Handler: func(request slacker.Request, response slacker.ResponseWriter) {
-			response.Typing()
+	// defSummary := &slacker.CommandDefinition{
+	// 	Description: "Get the summary of the given page.",
+	// 	Example:     "summary san francisco international airport",
+	// 	Handler: func(request slacker.Request, response slacker.ResponseWriter) {
+	// 		response.Typing()
 
-			text := request.StringParam("text", "")
-			result, lang, actualTitle := wikipedia.FetchSummary(text)
+	// 		text := request.StringParam("text", "")
+	// 		result, lang, actualTitle := wikipedia.FetchSummary(text)
 
-			attachments := getFullReplyAttachments(actualTitle, fmt.Sprintf("Here's the page for \"*%s*\" on %s.Wikipedia:", actualTitle, lang), result, lang)
-			response.Reply(text, slacker.WithBlocks(attachments))
-		},
-	}
+	// 		attachments := getFullReplyAttachments(actualTitle, fmt.Sprintf("Here's the page for \"*%s*\" on %s.Wikipedia:", actualTitle, lang), result, lang)
+	// 		response.Reply(text, slacker.WithBlocks(attachments))
+	// 	},
+	// }
 
-	defRelated := &slacker.CommandDefinition{
-		Description: "Find articles that are related to your search.",
-		Example:     "related Barack Obama",
-		Handler: func(request slacker.Request, response slacker.ResponseWriter) {
-			response.Typing()
+	// defRelated := &slacker.CommandDefinition{
+	// 	Description: "Find articles that are related to your search.",
+	// 	Example:     "related Barack Obama",
+	// 	Handler: func(request slacker.Request, response slacker.ResponseWriter) {
+	// 		response.Typing()
 
-			text := request.StringParam("text", "")
-			results, lang, actualText := wikipedia.FetchRelated(text)
+	// 		text := request.StringParam("text", "")
+	// 		results, lang, actualText := wikipedia.FetchRelated(text)
 
-			attachments := getFullReplyAttachments(actualText, fmt.Sprintf("Here's are some %s.Wikipedia articles related to \"*%s*\":", lang, actualText), results, lang)
-			response.Reply(text, slacker.WithBlocks(attachments), slacker.WithThreadReply(true))
-		},
-	}
+	// 		attachments := getFullReplyAttachments(actualText, fmt.Sprintf("Here's are some %s.Wikipedia articles related to \"*%s*\":", lang, actualText), results, lang)
+	// 		response.Reply(text, slacker.WithBlocks(attachments), slacker.WithThreadReply(true))
+	// 	},
+	// }
 
 	defSearch := &slacker.CommandDefinition{
 		Description: "Search for Wikipedia articles.",
@@ -180,10 +180,9 @@ func main() {
 		},
 	}
 
+	// bot.Command("summary <text>", defSummary)
 	bot.Command("get <text>", defGet)
-
-	bot.Command("summary <text>", defSummary)
-	bot.Command("related <text>", defRelated)
+	// bot.Command("related <text>", defRelated)
 	bot.Command("search <text>", defSearch)
 	bot.Command("top <text>", defTopviews)
 
