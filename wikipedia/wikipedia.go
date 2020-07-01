@@ -173,11 +173,10 @@ func FetchGetGeneralTerm(term string) (results []Page, related []Page, lang stri
 			searchPages = append([]Page{}, searchPages[:1]...)
 			toLog("FetchGetGeneralTerm returning first page of search results", searchPages[0].Title)
 			return searchPages, relatedPages, lang, actualTitle
-		} else {
-			// Return the search results
-			toLog("FetchGetGeneralTerm", "Returning full search results")
-			return searchPages, []Page{}, lang, actualTitle
 		}
+		// Return the search results
+		toLog("FetchGetGeneralTerm", "Returning full search results")
+		return searchPages, []Page{}, lang, actualTitle
 	}
 
 	// Search results not found. Return 'not found'
